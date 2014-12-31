@@ -67,6 +67,7 @@ class API():
 		response = self.call_api(BASEURL, query, query_args)
 		return response
 
+
 	
 
 if __name__ == "__main__":
