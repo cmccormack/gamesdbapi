@@ -6,7 +6,8 @@ import urllib2
 from xml.etree import ElementTree
 
 BASEURL = "http://thegamesdb.net/api/"
-USER_AGENT = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'
+USER_AGENT = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 '
+USER_AGENT += '(KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'
 
 class Game():
 	pass
@@ -29,6 +30,12 @@ class API():
 		request = urllib2.Request(call_url)
 		request.add_unredirected_header('User-Agent', USER_AGENT)
 		query_response = urllib2.urlopen(request).read()
+
+
+		# Cache a copy of the XML response locally
+		with open(query+'.xml', 'w') as output:
+			output.write(query_response + '\n')
+
 		return query_response
 
 	def getGamesList(self, name, platform_name=None, genre=None):
@@ -47,10 +54,10 @@ class API():
 		query = 'GetPlatformsList'
 
 		response = self.call_api(BASEURL, query)
+		
 		return self.parsePlatformsList(response)
-
+		
 	def parsePlatformsList(self, response):
-		#platformsxml = ElementTree.parse(response)
 		root = ElementTree.fromstring(response)
 		platforms = {}
 		for element in root.findall('./Platforms/Platform'):
@@ -58,6 +65,7 @@ class API():
 			platform_name = element.find('name').text
 			platform_alias = element.find('alias').text if element.find('alias') else None
 			platforms[platform_id] = platform_name, platform_alias
+
 		return platforms
 
 	def getPlatformGames(self, platform_id):
@@ -77,4 +85,4 @@ if __name__ == "__main__":
 		platforms = API().getPlatformsList()
 		print platforms
 		for platform in platforms:
-			print platform
+			print platforms[platform]
