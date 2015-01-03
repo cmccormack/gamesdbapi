@@ -15,23 +15,33 @@ class Game():
 	pass
 		
 class Platform():
-	def __init__(self, platform_id, platform_name, platform_alias=None):
-		self.platform_id = platform_id
-		self.platform_name = platform_name
-		self.platform_alias = platform_alias
 
-def call_api(base_url, query, query_args={}):
+	def __init__(self, p_id, name=None, alias=None):
+		self.id = p_id
+		self.name = name
+		self.alias = alias
+
+	def __str__(self):
+		return "Platform id:{0} name:{1} alias:{2}".format(self.id, self.name, self.alias)
+
+
+def call_api(query, query_args={}):
 	local_xml = query + '.xml'
 
 	# Check if cached xml exists, retrieved within the last hour
-	time_diff = time.time() - os.path.getmtime(local_xml)
-	if os.path.isfile(local_xml) and time_diff < 3600:
-		print "Found cached copy of {}, skipping API call.".format(query)
-		with open(local_xml) as inxml:
-			return inxml.read()
+	
+	if os.path.isfile(local_xml):
+		time_diff = time.time() - os.path.getmtime(local_xml)
+		if time_diff < 3600:
+			print "Found cached copy of {}, skipping API call. ".format(query),
+			print "Last call {} minutes {} seconds ago.".format(
+				int(time_diff/60), int(time_diff % 60))
+
+		with open(local_xml) as input_xml:
+			return input_xml.read()
 
 	url_values = urllib.urlencode(query_args)
-	call_url = base_url + query + '.php?' + url_values
+	call_url = API_URL + query + '.php?' + url_values
 	print call_url
 	request = urllib2.Request(call_url)
 	request.add_unredirected_header('User-Agent', USER_AGENT)
@@ -43,7 +53,39 @@ def call_api(base_url, query, query_args={}):
 
 	return query_response
 
+
+def getPlatformsList():
+
+	query = 'GetPlatformsList'
+
+	response = call_api(API_URL, query)
+	root = ElementTree.fromstring(response)
+	
+	platforms = []
+	for element in root.findall('./Platforms/Platform'):
+		platform = Platform(element.find('id').text)
+		name = element.find('name')
+		if name is not None:
+			platform.name = name.text
+		alias = element.find('alias')
+		if alias is not None:
+			platform.alias = alias.text
+
+		platforms.append(platform)
+
+	return platforms
+
+
+def getPlatformGames(platform_id):
+	query = 'GetPlatformGames'
+	query_args = {'platform':platform_id}
+
+	response = call_api(query, query_args)
+	return response
+
+
 def getGamesList(name, platform_name=None, genre=None):
+
 	query = 'GetGamesList'
 	query_args = {'name':name}
 	if platform:
@@ -51,48 +93,24 @@ def getGamesList(name, platform_name=None, genre=None):
 	if genre:
 		query_args['genre'] = genre
 
-	response = self.call_api(API_URL, query, query_args)
+	response = call_api(query, query_args)
 	return response
 
 
-def getPlatformsList():
-	query = 'GetPlatformsList'
+def getGame(name=None, platform=None, game_id=None):
 
-	response = call_api(API_URL, query)
-	
-	return parsePlatformsList(response)
-	
-def parsePlatformsList(response):
-	root = ElementTree.fromstring(response)
-	platforms = {}
-	for element in root.findall('./Platforms/Platform'):
-		platform_id = element.find('id').text
-		platform_name = element.find('name')
-		if platform_name is not None:
-			platform_name = platform_name.text
-		platform_alias = element.find('alias')
-		if platform_alias is not None:
-			platform_alias = platform_alias.text
+	query = 'GetGame'
+	query_args = {'name': name, 'platform':platform, 'id':game_id}
 
-		platforms[platform_id] = platform_name, platform_alias
-
-	return platforms
-
-def getPlatformGames(platform_id):
-	query = 'GetPlatformGames'
-	query_args = {'platform':platform_id}
-
-	response = call_api(API_URL, query, query_args)
+	response = call_api(query, query_args)
 	return response
+
 
 
 	
 
 if __name__ == "__main__":
-	with open('output.txt', 'w') as out:
-		#out.write(API().getGamesList('Super', platform = 'Super Nintendo (SNES)'))
-		#out.write(API().getPlatformGames('0'))
-		platforms = getPlatformsList()
-		#print platforms
-		for platform in platforms:
-			print platforms[platform]
+	#with open('output.txt', 'w') as out:
+	#	pass
+	print getGame(game_id='1')
+		
