@@ -23,10 +23,12 @@ class Platform():
 def call_api(base_url, query, query_args={}):
 	local_xml = query + '.xml'
 
-	# Check if cached version exists that was retrieved within the last hour
-	if os.path.isfile(local_xml) and (time.time() - os.path.getmtime(local_xml)) < 3600:
-		with open(local_xml) as in:
-			return in
+	# Check if cached xml exists, retrieved within the last hour
+	time_diff = time.time() - os.path.getmtime(local_xml)
+	if os.path.isfile(local_xml) and time_diff < 3600:
+		print "Found cached copy of {}, skipping API call.".format(query)
+		with open(local_xml) as inxml:
+			return inxml.read()
 
 	url_values = urllib.urlencode(query_args)
 	call_url = base_url + query + '.php?' + url_values
