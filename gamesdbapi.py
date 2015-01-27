@@ -65,18 +65,27 @@ class Image(object):
         and game images
     """
 
-    def __init__(self, img_type, img_url, img_values=None):
+    def __init__(self, img_type, img_url, thumb=None, img_attribs=None):
         
         self.type = img_type
         self.url = img_url
+        self.thumb = thumb
 
-        if img_values:
-            self.side = ''
-            self.width = ''
-            self.height = ''
-            self.thumb = ''
-
-
+        # Parse image attributes
+        self.attribs = {'side': '',
+                        'width': '',
+                        'height': ''
+                        }
+        if img_attribs:
+            for attrib in img_attribs:
+                self.attribs[attrib] = img_attribs[attrib]
+        self.side = self.attribs['side']
+        self.width = self.attribs['width']
+        self.height = self.attribs['height']
+            
+    def __str__(self):
+        return "TYPE:{}, URL:{}, THUMB_URL:{}, ATTRIBS:{})".format(
+            self.type, self.url, self.thumb, self.attribs)
 
 
 def call_api(query, query_args=None):
@@ -105,7 +114,11 @@ def call_api(query, query_args=None):
 
     request = urllib2.Request(call_url)
     request.add_unredirected_header('User-Agent', USER_AGENT)
-    query_response = urllib2.urlopen(request).read()
+
+    try:
+        query_response = urllib2.urlopen(request).read()
+    except:
+        print "Unable to connect to {}".format(request)
 
     # Cache a copy of the XML response locally
     with open(local_xml, 'w') as output:
@@ -152,6 +165,8 @@ def get_platform(platform_id):
             Platform object with metadata attributes
     """
 
+    platform_img_types = ['fanart', 'boxart', 'banner',
+                          'consoleart', 'controllerart']
     query = 'GetPlatform'
     query_args = {'id': platform_id}
 
@@ -184,24 +199,22 @@ def get_platform(platform_id):
 
     # Gather platform image details from API response
     base_img_url = root.find('baseImgUrl').text
+
+    # Combine all image types into a single list for iteration
+    all_imgs = []
+    for img_type in platform_img_types:
+        all_imgs += root.findall('.//' + img_type)
+
+    # Iterate over each image type and store Image object in list
     images = []
-
-    for element in root.findall('.//fanart'):
-        img_attribs = {
-            'side': '',
-            'width': '',
-            'height': '',
-        }
-        img = ''
-        img_type = ''
-        img_side = ''
-        img_width = ''
-        img_height = ''
-        img_thumb = ''
-
-        for elem in element:
-            # images.append(Image(element.tag, ))
-            print element.tag, elem.tag, elem.text, elem.attrib
+    for element in all_imgs:
+        thumb = ''
+        if element.tag == 'fanart':
+            thumb = element.find('.//thumb').text
+            element = element.find('.//original')
+        images.append(Image(element.tag, base_img_url + element.text,
+                            thumb, element.attrib))
+    p_values['images'] = images
 
     return Platform(p_values['id'], p_values['Platform'], p_values)
 
@@ -244,5 +257,6 @@ def get_game(name=None, platform=None, game_id=None):
 
 
 if __name__ == "__main__":
-    get_platform('15')
+    platform = get_platform('18')
+    print '\n'.join([image.url for image in platform.p_images if image.url])
         
