@@ -2,6 +2,25 @@
 # -*- coding: utf-8 -*-
 
 """
+API Call Status:
+==========================
+
+Complete:
+-----------
+GetPlatformsList
+
+Incomplete:
+-----------
+GetGamesList
+GetGame
+GetArt
+GetPlatform
+GetPlatformGames
+PlatformGames
+Updates
+UserRating
+UserFavorites
+===========================
 """
 import os
 import time
@@ -26,66 +45,51 @@ class Game(object):
 
 
 class Platform(object):
-    """ To be completed
+    """ Platform object to hold id and name information, as well
+        as additional optional attributes.
     """
 
-    def __init__(self, platform_id, platform_name, platform_values=None):
+    def __init__(self, ident, name, alias=''):
 
-        self.p_values = platform_values
-        self.p_id = platform_id
-        self.p_name = platform_name
-        if platform_values and platform_values['alias']:
-            self.p_alias = platform_values['alias']
+        self.id = ident
+        self.name = name
+        self.alias = alias
 
-        if self.p_values:
-            self.p_alias = self.p_values['alias']
-            self.p_platform = self.p_values['Platform']
-            self.p_overview = self.p_values['overview']
-            self.p_developer = self.p_values['developer']
-            self.p_manufacturer = self.p_values['manufacturer']
-            self.p_cpu = self.p_values['cpu']
-            self.p_memory = self.p_values['memory']
-            self.p_graphics = self.p_values['graphics']
-            self.p_sound = self.p_values['sound']
-            self.p_display = self.p_values['display']
-            self.p_media = self.p_values['media']
-            self.p_maxcontrollers = self.p_values['maxcontrollers']
-            self.p_youtube = self.p_values['Youtube']
-            self.p_rating = self.p_values['Rating']
-            self.p_images = self.p_values['images']
+        self.platform = ''
+        self.overview = ''
+        self.developer = ''
+        self.manufacturer = ''
+        self.cpu = ''
+        self.memory = ''
+        self.graphics = ''
+        self.sound = ''
+        self.display = ''
+        self.media = ''
+        self.maxcontrollers = ''
+        self.youtube = ''
+        self.rating = ''
+        self.images = []
 
     def __str__(self):
-        return '\n'.join(
-            [k+':'+self.p_values[k]for k in self.p_values if self.p_values[k]]
-        )
+        return str(self.__dict__)
 
 
 class Image(object):
     """ Image object to hold URL and dimension information for platform
-        and game images
+        and game images.
     """
 
-    def __init__(self, img_type, img_url, thumb=None, img_attribs=None):
+    def __init__(self, img_type, img_url, img_thumb=None):
         
         self.type = img_type
         self.url = img_url
-        self.thumb = thumb
-
-        # Parse image attributes
-        self.attribs = {'side': '',
-                        'width': '',
-                        'height': ''
-                        }
-        if img_attribs:
-            for attrib in img_attribs:
-                self.attribs[attrib] = img_attribs[attrib]
-        self.side = self.attribs['side']
-        self.width = self.attribs['width']
-        self.height = self.attribs['height']
+        self.thumb = img_thumb
+        self.width = ''
+        self.height = ''
+        self.side = ''
             
     def __str__(self):
-        return "TYPE:{}, URL:{}, THUMB_URL:{}, ATTRIBS:{})".format(
-            self.type, self.url, self.thumb, self.attribs)
+        return str(self.__dict__)
 
 
 def call_api(query, query_args=None):
@@ -129,27 +133,32 @@ def call_api(query, query_args=None):
 
 
 def get_platforms_list():
-    """ To be completed
+    """ Returns a listing of all platforms available on the site,
+        sorted by alphabetical order by name.
+
+        Parameters:
+            None
+
+        Returns:
+            A list of Platform objects
     """
 
+    # API Call
     query = 'GetPlatformsList'
-
     response = call_api(query)
     root = ElementTree.fromstring(response)
 
+    # Parse API response
     platforms = []
-    p_values = {
-        'id': None,
-        'name': None,
-        'alias': None
-    }
     for element in root.findall('./Platforms/Platform'):
+        p_id = element.find('id').text
+        p_name = element.find('name').text
+        platform = Platform(p_id, p_name)
 
         for elem in element:
-            p_values[elem.tag] = elem.text
+            setattr(platform, elem.tag.lower(), elem.text)
 
-        platforms.append(
-            Platform(p_values['id'], p_values['name'], p_values['alias']))
+        platforms.append(platform)
 
     return platforms
 
@@ -163,60 +172,47 @@ def get_platform(platform_id):
 
         Returns:
             Platform object with metadata attributes
+
+        To Do:
+            Additional testing
+            Cleanup unicode and HTML text
     """
 
-    platform_img_types = ['fanart', 'boxart', 'banner',
-                          'consoleart', 'controllerart']
+    # API Call
     query = 'GetPlatform'
     query_args = {'id': platform_id}
-
     response = call_api(query, query_args)
     root = ElementTree.fromstring(response)
 
-    p_values = {
-        'id': '',
-        'Platform': '',
-        'alias': '',
-        'overview': '',
-        'developer': '',
-        'manufacturer': '',
-        'cpu': '',
-        'memory': '',
-        'graphics': '',
-        'sound': '',
-        'display': '',
-        'media': '',
-        'maxcontrollers': '',
-        'Youtube': '',
-        'Rating': '',
-        'images': ''
-    }
+    if root.tag == 'Error':
+        return None
 
     # Gather platform attributes from API response
-    for element in root.findall('Platform'):
-        for elem in element:
-            p_values[elem.tag] = elem.text
+    p_id = root.find('.//Platform/id').text
+    p_name = root.find('.//Platform/Platform').text
+    platform = Platform(p_id, p_name)
+
+    for element in root.find('Platform'):
+        setattr(platform, element.tag.lower(), element.text)
 
     # Gather platform image details from API response
+    #  Iterate over each image type and store Image object in list
     base_img_url = root.find('baseImgUrl').text
-
-    # Combine all image types into a single list for iteration
-    all_imgs = []
-    for img_type in platform_img_types:
-        all_imgs += root.findall('.//' + img_type)
-
-    # Iterate over each image type and store Image object in list
-    images = []
-    for element in all_imgs:
-        thumb = ''
+    platform_images = []
+    for element in root.find('.//Platform/Images'):
+        thumb = element.find('thumb')
+        if thumb is not None:
+            thumb = thumb.text
         if element.tag == 'fanart':
-            thumb = element.find('.//thumb').text
-            element = element.find('.//original')
-        images.append(Image(element.tag, base_img_url + element.text,
-                            thumb, element.attrib))
-    p_values['images'] = images
+            element = element.find('original')
+        platform_image = Image(element.tag, base_img_url + element.text, thumb)
+        for elem in element.attrib:
+            setattr(platform_image, elem.lower(), element.attrib[elem])
+        platform_images.append(platform_image)
 
-    return Platform(p_values['id'], p_values['Platform'], p_values)
+    platform.images = platform_images
+
+    return platform
 
 
 def get_platform_games(platform_id):
@@ -257,6 +253,9 @@ def get_game(name=None, platform=None, game_id=None):
 
 
 if __name__ == "__main__":
-    platform = get_platform('18')
-    print '\n'.join([image.url for image in platform.p_images if image.url])
+    #platform = get_platform(1)
+    for i in range(5):
+        platform = get_platform(i)
+        if platform:
+            print platform
         
