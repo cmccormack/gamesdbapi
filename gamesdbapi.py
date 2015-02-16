@@ -6,15 +6,22 @@ API Call Status:
 ==========================
 
 Complete:
------------
+----------------
+
+Almost complete:
+----------------
 GetPlatformsList
+GetPlatform
+GetGamesList
+
+Current:
+----------------
+GetGame
 
 Incomplete:
------------
-GetGamesList
+----------------
 GetGame
 GetArt
-GetPlatform
 GetPlatformGames
 PlatformGames
 Updates
@@ -37,11 +44,26 @@ class Game(object):
     """ To be completed
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, identifier, name=''):
+
+        self.identifier = identifier
+        self.gametitle = name
+
+        self.platform = ''
+        self.releasedate = ''
+        self.overview = ''
+        self.esrb = ''
+        self.genres = []
+        self.players = ''
+        self.coop = ''
+        self.youtube = ''
+        self.publisher = ''
+        self.developer = ''
+        self.rating = ''
+        self.images = []
 
     def __str__(self):
-        pass
+        return str(self.__dict__)
 
 
 class Platform(object):
@@ -49,9 +71,9 @@ class Platform(object):
         as additional optional attributes.
     """
 
-    def __init__(self, ident, name, alias=''):
+    def __init__(self, identifier, name, alias=''):
 
-        self.id = ident
+        self.identifier = identifier
         self.name = name
         self.alias = alias
 
@@ -80,14 +102,14 @@ class Image(object):
     """
 
     def __init__(self, img_type, img_url, img_thumb=None):
-        
+
         self.type = img_type
         self.url = img_url
         self.thumb = img_thumb
         self.width = ''
         self.height = ''
         self.side = ''
-            
+
     def __str__(self):
         return str(self.__dict__)
 
@@ -114,14 +136,14 @@ def call_api(query, query_args=None):
                     print "Last call {} minutes {} seconds ago.".format(
                         int(time_diff/60), int(time_diff % 60))
                     return input_xml.read()
-    # End cache check snippet -----------------------
+    # End cache check snippet ----------------------------------
 
     request = urllib2.Request(call_url)
     request.add_unredirected_header('User-Agent', USER_AGENT)
 
     try:
         query_response = urllib2.urlopen(request).read()
-    except:
+    except urllib2.URLError:
         print "Unable to connect to {}".format(request)
 
     # Cache a copy of the XML response locally
@@ -129,7 +151,7 @@ def call_api(query, query_args=None):
         output.write(query_comment_xml + '\n')
         output.write(query_response + '\n')
         return query_response
-    # End cache write snippet -----------------------
+    # End cache write snippet ----------------------------------
 
 
 def get_platforms_list():
@@ -227,18 +249,46 @@ def get_platform_games(platform_id):
 
 
 def get_games_list(name, platform_name=None, genre=None):
-    """ To be completed
+    """ Returns a listing of games matched up with loose search terms.
+
+        Parameters:
+            name (str):
+                name of game or other detail in game description
+            platform (str) (optional):
+                filters results by platform
+            genre (str) (optional):
+                filters results by genre
+
+        Returns:
+            list containing Game objects
+
     """
 
+    # API Call
     query = 'GetGamesList'
     query_args = {'name': name}
     if platform_name:
         query_args['platform'] = platform_name
     if genre:
         query_args['genre'] = genre
-
     response = call_api(query, query_args)
-    return response
+    root = ElementTree.fromstring(response)
+    if root.tag == 'Error':
+        return None
+
+    # Parse API Response
+    games = []
+    for element in root.findall('Game'):
+        g_id = element.find('id').text
+        g_name = element.find('GameTitle').text
+        game_obj = Game(g_id, g_name)
+
+        for elem in element:
+            setattr(game_obj, elem.tag.lower(), elem.text)
+
+        games.append(game_obj)
+
+    return games
 
 
 def get_game(name=None, platform=None, game_id=None):
@@ -253,9 +303,5 @@ def get_game(name=None, platform=None, game_id=None):
 
 
 if __name__ == "__main__":
-    #platform = get_platform(1)
-    for i in range(5):
-        platform = get_platform(i)
-        if platform:
-            print platform
-        
+    for game in get_games_list('luna'):
+        print game
